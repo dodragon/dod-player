@@ -73,7 +73,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/dodragon/dodPlayer")
+            url = uri("https://maven.pkg.github.com/dodragon")
             credentials {
                 username = project.ext.get("gprUser") as String
                 password = project.ext.get("gprKey") as String
