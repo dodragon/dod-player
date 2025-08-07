@@ -1,4 +1,5 @@
 plugins {
+    id("maven-publish")
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
@@ -55,28 +56,3 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }
-
-/*publishing {
-    publications {
-        create<MavenPublication>("release") {
-            groupId = "dodragon"
-            artifactId = "dod-player"
-            version = "1.0.2"
-
-            afterEvaluate {
-                from(components["release"])
-            }
-        }
-    }
-
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/dodragon")
-            credentials {
-                username = if (project.hasProperty("gprUser")) project.property("gprUser") as String else null
-                password = if (project.hasProperty("gprKey")) project.property("gprKey") as String else null
-            }
-        }
-    }
-}*/
