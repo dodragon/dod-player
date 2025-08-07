@@ -15,7 +15,9 @@
 - **버퍼링 상태 표시**: 네트워크 상태가 불안정할 때 자동으로 로딩 아이콘을 표시하여 사용자 경험을 향상시킵니다.
 
 ## 🚀 사용법
-
+```kotlin
+implementation("com.github.dodragon:dod-player:${NEW_VERSION}")
+```
 `DodPlayerView` Composable을 화면에 추가하고, 재생할 미디어 정보를 `mediaItems` 파라미터로 전달하기만 하면 됩니다.
 
 ```kotlin
@@ -166,7 +168,9 @@ Activity의 매니페스트 태그에 아래 속성을 추가하여 PIP 모드�
 - **Buffering indicator**: Displays a loading indicator automatically during unstable network conditions.
 
 ## 🚀 Usage
-
+```kotlin
+implementation("com.github.dodragon:dod-player:${NEW_VERSION}")
+```
 Use the `DodPlayerView` composable and provide a list of media items through the `mediaItems` parameter.
 
 ```kotlin
