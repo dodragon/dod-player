@@ -39,9 +39,7 @@ object DodPlayerSetting {
     var controllerBackgroundColorAlpha = 0.4f
 
     //닫기 버튼 필요한 경우
-    var needClose = false
-    //닫기 버튼 onClick
-    var onClose = {}
+    var needClose = true
 
     //전체화면 필요한 경우
     var needFullscreen = true
@@ -53,8 +51,8 @@ object DodPlayerSetting {
 
     //타이머 포멧
     var needTimeText = true
-    var timeFormat: (String, String) -> String = { a, b ->
-        "${a}/${b}"
+    var timeFormat: (duration: String, wholeTime: String) -> String = { duration, wholeTime ->
+        "${duration}/${wholeTime}"
     }
 
     //뒤로 빨리감기 초

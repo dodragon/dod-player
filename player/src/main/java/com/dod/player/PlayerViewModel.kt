@@ -28,6 +28,8 @@ class PlayerViewModel(
 
     private var lastVolume: Float = 1f
 
+    private var mediaItems = listOf<DodPlayerItem>()
+
     val exoPlayer: ExoPlayer = ExoPlayer
         .Builder(application)
         .setSeekBackIncrementMs(DodPlayerSetting.backwardSec * 1000L)
@@ -43,16 +45,21 @@ class PlayerViewModel(
                 player: Player,
                 events: Player.Events
             ) {
-                val params = player.trackSelectionParameters
-                _playerState.update {
+                if (events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_PLAY_WHEN_READY_CHANGED)) {
                     DodPlayerSetting.isPlaying = player.isPlaying
-                    it.copy(
-                        isPlaying = player.isPlaying,
-                        duration = player.duration.coerceAtLeast(0),
-                        isMuted = player.volume == 0f,
-                        hasSubtitle = player.currentTracks.groups.any { group -> group.type == C.TRACK_TYPE_TEXT },
-                        isSubtitleOn = !params.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
-                    )
+                    _playerState.update { it.copy(isPlaying = player.isPlaying) }
+                }
+
+                if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED)) {
+                    _playerState.update { it.copy(isBuffering = player.playbackState == Player.STATE_BUFFERING) }
+                }
+
+                if (events.contains(Player.EVENT_VOLUME_CHANGED)) {
+                    _playerState.update { it.copy(isMuted = player.volume == 0f) }
+                }
+
+                if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) || events.contains(Player.EVENT_TRACKS_CHANGED)) {
+                    updatePlayerState(player)
                 }
             }
         })
@@ -75,54 +82,147 @@ class PlayerViewModel(
         }
     }
 
-    fun setMedia(
-        videoUrl: String,
-        subtitleUrl: String
+    private fun updatePlayerState(
+        player: Player
     ) {
-        if (exoPlayer.currentMediaItem?.mediaId == videoUrl) return
+        val availableSubtitles = getAvailableSubtitles(player)
+        val selectedSubtitle = availableSubtitles.find { it.isSelected }
 
-        val subtitleMimeType = getMimeTypeFromUrl(subtitleUrl)
-        val subtitleLanguage = getLanguageFromUrl(subtitleUrl)
-
-        val mediaItemBuilder = MediaItem.Builder()
-            .setUri(videoUrl)
-            .setMediaId(videoUrl)
-
-        if (subtitleMimeType != null) {
-            val subtitle = MediaItem.SubtitleConfiguration.Builder(subtitleUrl.toUri())
-                .setMimeType(subtitleMimeType)
-                .setLanguage(subtitleLanguage)
-                .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                .build()
-            mediaItemBuilder.setSubtitleConfigurations(listOf(subtitle))
+        _playerState.update {
+            it.copy(
+                duration = player.duration.coerceAtLeast(0),
+                isMuted = player.volume == 0f,
+                hasSubtitle = availableSubtitles.isNotEmpty(),
+                availableSubtitles = availableSubtitles,
+                selectedSubtitle = selectedSubtitle,
+                currentMediaIndex = player.currentMediaItemIndex,
+                totalMediaCount = player.mediaItemCount
+            )
         }
+    }
 
-        exoPlayer.setMediaItem(mediaItemBuilder.build())
+    fun setMediaItems(
+        items: List<DodPlayerItem>,
+        startIndex: Int = 0
+    ) {
+        if (mediaItems == items) return
+        mediaItems = items
+        val exoPlayerMediaItems = items.map { dodPlayerItem ->
+            buildMediaItem(dodPlayerItem)
+        }
+        exoPlayer.setMediaItems(exoPlayerMediaItems, startIndex, C.TIME_UNSET)
         exoPlayer.prepare()
     }
 
+    private fun buildMediaItem(
+        item: DodPlayerItem
+    ): MediaItem {
+        val subtitleConfigs = item.subtitles.mapIndexed { index, subtitle ->
+            MediaItem.SubtitleConfiguration.Builder(subtitle.url.toUri())
+                .setMimeType(getMimeTypeFromUrl(subtitle.url))
+                .setLanguage(getLanguageFromUrl(subtitle.url))
+                .setSelectionFlags(if (index == 0) C.SELECTION_FLAG_DEFAULT else 0)
+                .build()
+        }
+        return MediaItem.Builder()
+            .setUri(item.videoUrl)
+            .setSubtitleConfigurations(subtitleConfigs)
+            .build()
+    }
+
+    private fun getAvailableSubtitles(
+        player: Player
+    ): List<TrackInfo> {
+        val tracks = player.currentTracks
+        // 현재 재생 중인 미디어 아이템 정보를 가져옴
+        val currentItem = mediaItems.getOrNull(player.currentMediaItemIndex) ?: return emptyList()
+
+        return tracks.groups
+            .mapIndexedNotNull { groupIndex, group ->
+                if (group.type == C.TRACK_TYPE_TEXT) {
+                    (0 until group.length).map { trackIndex ->
+                        val format = group.getTrackFormat(trackIndex)
+                        val trackLanguage = format.language
+
+                        // ExoPlayer의 언어 코드를 이용해 사용자가 입력한 SubtitleItem을 찾음
+                        val userDefinedDisplayName = currentItem.subtitles
+                            .find { getLanguageFromUrl(it.url) == trackLanguage }?.displayName
+
+                        // 사용자 정의 이름이 있으면 사용하고, 없으면 기존 방식으로 대체
+                        val displayName = userDefinedDisplayName
+                            ?: format.label
+                            ?: trackLanguage
+                            ?: "Unknown"
+
+                        TrackInfo(
+                            groupIndex = groupIndex,
+                            trackIndex = trackIndex,
+                            displayName = displayName, // << 최종 displayName 적용
+                            isSelected = group.isTrackSelected(trackIndex),
+                            language = trackLanguage
+                        )
+                    }
+                } else null
+            }
+            .flatten()
+    }
+
+    fun selectSubtitle(
+        track: TrackInfo?
+    ) {
+        val parametersBuilder = exoPlayer.trackSelectionParameters.buildUpon()
+
+        if (track == null) {
+            // 자막 끄기: Text 트랙 타입을 비활성화
+            parametersBuilder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        } else {
+            // 특정 자막 선택하기
+            parametersBuilder
+                // 1. Text 트랙 타입을 활성화
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                // 2. 선택된 자막의 언어 코드를 선호 언어로 설정
+                .setPreferredTextLanguage(track.language)
+        }
+
+        exoPlayer.trackSelectionParameters = parametersBuilder.build()
+    }
+
     private fun getMimeTypeFromUrl(
-        url: String
+        url: String?
     ): String? {
-        val extension = url.substringAfterLast('.', "").lowercase()
+        val extension = url?.substringAfterLast('.', "")?.lowercase()
 
         return when (extension) {
             "vtt" -> MimeTypes.TEXT_VTT
             "srt" -> MimeTypes.APPLICATION_SUBRIP
-            "srt.txt" -> MimeTypes.APPLICATION_SUBRIP // 이전 예시 같은 경우 처리
-            "ssa", "ass" -> MimeTypes.TEXT_SSA // (확장) 다른 자막 형식도 추가 가능
-            else -> null // 지원하지 않는 형식이면 null 반환
+            "srt.txt" -> MimeTypes.APPLICATION_SUBRIP
+            "ssa", "ass" -> MimeTypes.TEXT_SSA
+            else -> null
         }
     }
 
-    private fun getLanguageFromUrl(url: String): String {
-        val fileName = url.substringAfterLast('/').substringBeforeLast('.')
-        val potentialCode = fileName.substringAfterLast('.').ifEmpty { fileName.substringAfterLast('_') }.lowercase()
+    private fun getLanguageFromUrl(
+        url: String?
+    ): String? {
+        val fileName = url?.substringAfterLast('/')?.substringBeforeLast('.')
+        val potentialCode = fileName?.substringAfterLast('.')?.ifEmpty { fileName.substringAfterLast('_') }?.lowercase()
         return when (potentialCode) {
             "ko", "kr", "korean" -> "ko"
             "en", "us", "gb", "english" -> "en"
             "ja", "jp", "japanese" -> "ja"
-            else -> if (potentialCode.length == 2) potentialCode else "und"
+            else -> if (potentialCode?.length == 2) potentialCode else "und"
+        }
+    }
+
+    fun playPrevious() {
+        if (exoPlayer.hasPreviousMediaItem()) {
+            exoPlayer.seekToPreviousMediaItem()
+        }
+    }
+
+    fun playNext() {
+        if (exoPlayer.hasNextMediaItem()) {
+            exoPlayer.seekToNextMediaItem()
         }
     }
 
@@ -133,15 +233,6 @@ class PlayerViewModel(
         } else {
             exoPlayer.volume = lastVolume
         }
-    }
-
-    fun toggleSubtitles() {
-        val currentParams = exoPlayer.trackSelectionParameters
-        val isTextDisabled = currentParams.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
-
-        exoPlayer.trackSelectionParameters = currentParams.buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !isTextDisabled)
-            .build()
     }
 
     fun togglePlayPause() {
@@ -175,8 +266,30 @@ data class PlayerState(
     val duration: Long = 0L,
     val isMuted: Boolean = false,
     val isPlaying: Boolean = false,
-    val isSubtitleOn: Boolean = false,
-    val hasSubtitle: Boolean = false
+    val isBuffering: Boolean = false,
+    val hasSubtitle: Boolean = false,
+    val availableSubtitles: List<TrackInfo> = emptyList(),
+    val selectedSubtitle: TrackInfo? = null,
+    val currentMediaIndex: Int = 0,
+    val totalMediaCount: Int = 0
+)
+
+data class TrackInfo(
+    val groupIndex: Int,
+    val trackIndex: Int,
+    val displayName: String,
+    val language: String?,
+    val isSelected: Boolean
+)
+
+data class DodPlayerItem(
+    val videoUrl: String,
+    val subtitles: List<SubtitleItem> = emptyList()
+)
+
+data class SubtitleItem(
+    val url: String,
+    val displayName: String
 )
 
 enum class TapAnimationState {
