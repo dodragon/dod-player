@@ -59,8 +59,8 @@ dependencies {
 
 publishing {
     publications {
-        create<MavenPublication>("dodPlayerAAR") {
-            groupId = "com.github.dodragon"
+        create<MavenPublication>("release") {
+            groupId = "dodragon"
             artifactId = "dodPlayer"
             version = "1.0.0"
 
