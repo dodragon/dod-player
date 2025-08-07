@@ -1,5 +1,4 @@
 plugins {
-    id("maven-publish")
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
@@ -57,12 +56,12 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
-publishing {
+/*publishing {
     publications {
         create<MavenPublication>("release") {
             groupId = "dodragon"
-            artifactId = "dodPlayer"
-            version = "1.0.0"
+            artifactId = "dod-player"
+            version = "1.0.2"
 
             afterEvaluate {
                 from(components["release"])
@@ -75,9 +74,9 @@ publishing {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/dodragon")
             credentials {
-                username = project.ext.get("gprUser") as String
-                password = project.ext.get("gprKey") as String
+                username = if (project.hasProperty("gprUser")) project.property("gprUser") as String else null
+                password = if (project.hasProperty("gprKey")) project.property("gprKey") as String else null
             }
         }
     }
-}
+}*/
