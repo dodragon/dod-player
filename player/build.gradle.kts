@@ -64,7 +64,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.dodragon"
                 artifactId = "dod-player"
-                version = "1.0.1"
+                version = "1.0.2"
             }
         }
     }
