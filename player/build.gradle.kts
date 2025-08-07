@@ -45,8 +45,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.material3)
 
-    implementation(libs.exoplayer)
-    implementation(libs.exoplayer.ui)
+    /*implementation(libs.exoplayer)
+    implementation(libs.exoplayer.ui)*/
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
 
@@ -64,7 +64,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.dodragon"
                 artifactId = "dod-player"
-                version = "1.0.2"
+                version = "1.0.3"
             }
         }
     }
