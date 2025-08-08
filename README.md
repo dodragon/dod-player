@@ -32,12 +32,10 @@ val mediaItems = listOf(
         subtitles = listOf(
             SubtitleItem(
                 url = "https://your-subtitle-url.com/en.vtt",
-                language = "en",
                 displayName = "English"
             ),
             SubtitleItem(
                 url = "https://your-subtitle-url.com/ko.srt",
-                language = "ko",
                 displayName = "한국어"
             )
         )
@@ -185,12 +183,10 @@ val mediaItems = listOf(
         subtitles = listOf(
             SubtitleItem(
                 url = "https://your-subtitle-url.com/en.vtt",
-                language = "en",
                 displayName = "English"
             ),
             SubtitleItem(
                 url = "https://your-subtitle-url.com/ko.srt",
-                language = "ko",
                 displayName = "Korean"
             )
         )
